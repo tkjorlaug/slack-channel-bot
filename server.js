@@ -1,17 +1,43 @@
 import express from "express";
 import fetch from "node-fetch";
+import crypto from "crypto";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 const {
-  SLACK_BOT_TOKEN,   // Bot token (xoxb-...)
-  ADMIN_CHANNEL_ID,  // Channel ID of your admin channel (e.g. #feed-automation-admin)
+  SLACK_BOT_TOKEN,
+  SLACK_SIGNING_SECRET,
+  ADMIN_CHANNEL_ID,
   PORT = 3000,
 } = process.env;
 
-// ─── Slack API helper ────────────────────────────────────────────────────────
+// ─── Raw body parser (needed for Slack signature verification) ────────────────
+
+app.use((req, res, next) => {
+  let data = "";
+  req.on("data", chunk => data += chunk);
+  req.on("end", () => {
+    req.rawBody = data;
+    try {
+      req.body = data.startsWith("{") ? JSON.parse(data) : Object.fromEntries(new URLSearchParams(data));
+    } catch { req.body = {}; }
+    next();
+  });
+});
+
+// ─── Slack signature verification ─────────────────────────────────────────────
+
+function verifySlack(req) {
+  const ts = req.headers["x-slack-request-timestamp"];
+  const sig = req.headers["x-slack-signature"];
+  if (!ts || !sig) return false;
+  if (Math.abs(Date.now() / 1000 - ts) > 300) return false;
+  const base = `v0:${ts}:${req.rawBody}`;
+  const hash = "v0=" + crypto.createHmac("sha256", SLACK_SIGNING_SECRET).update(base).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(sig));
+}
+
+// ─── Slack API helper ─────────────────────────────────────────────────────────
 
 async function slackAPI(method, body) {
   const res = await fetch(`https://slack.com/api/${method}`, {
@@ -27,34 +53,95 @@ async function slackAPI(method, body) {
   return data;
 }
 
-// ─── 1. Webhook — receives requests from Slack Workflow Builder ──────────────
+// ─── 1. Slash command — opens modal ──────────────────────────────────────────
 
-app.post("/request-channel", async (req, res) => {
-  const {
-    channel_name,
-    requester_id,
-    channel_type,
-    channel_privacy,
-    channel_topic,
-    channel_description,
-    channel_owner,
-  } = req.body;
+app.post("/slack/command", async (req, res) => {
+  if (!verifySlack(req)) return res.status(401).send("Unauthorized");
+  res.status(200).send(); // Acknowledge immediately
 
-  if (!channel_name || !requester_id) {
-    return res.status(400).json({ error: "Missing channel_name or requester_id" });
-  }
+  const triggerId = req.body.trigger_id;
 
-  // Sanitize channel name: lowercase, no spaces, max 80 chars
-  const sanitized = channel_name
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-_]/g, "")
-    .slice(0, 80);
+  await slackAPI("views.open", {
+    trigger_id: triggerId,
+    view: {
+      type: "modal",
+      callback_id: "channel_request_modal",
+      title: { type: "plain_text", text: "Request a Channel" },
+      submit: { type: "plain_text", text: "Submit" },
+      close: { type: "plain_text", text: "Cancel" },
+      blocks: [
+        {
+          type: "input",
+          block_id: "channel_name",
+          label: { type: "plain_text", text: "What should the channel name be?" },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. project-marketing" } },
+        },
+        {
+          type: "input",
+          block_id: "channel_privacy",
+          label: { type: "plain_text", text: "Should this channel be public or private?" },
+          element: {
+            type: "static_select",
+            action_id: "value",
+            options: [
+              { text: { type: "plain_text", text: "Public" }, value: "public" },
+              { text: { type: "plain_text", text: "Private" }, value: "private" },
+            ],
+          },
+        },
+        {
+          type: "input",
+          block_id: "channel_type",
+          label: { type: "plain_text", text: "What type of channel is this?" },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Project, Team, Social" } },
+        },
+        {
+          type: "input",
+          block_id: "channel_topic",
+          label: { type: "plain_text", text: "What is the topic of this channel?" },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
+          optional: true,
+        },
+        {
+          type: "input",
+          block_id: "channel_description",
+          label: { type: "plain_text", text: "What is the description of this channel?" },
+          element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
+          optional: true,
+        },
+        {
+          type: "input",
+          block_id: "channel_owner",
+          label: { type: "plain_text", text: "Who will own this channel?" },
+          element: { type: "users_select", action_id: "value" },
+        },
+      ],
+    },
+  });
+});
 
-  try {
+// ─── 2. Modal submission — posts approval message ─────────────────────────────
+
+app.post("/slack/actions", async (req, res) => {
+  const payload = JSON.parse(req.body.payload);
+  res.status(200).send(); // Acknowledge immediately
+
+  // Handle modal submission
+  if (payload.type === "view_submission" && payload.view.callback_id === "channel_request_modal") {
+    const vals = payload.view.state.values;
+    const requester_id = payload.user.id;
+
+    const channel_name = vals.channel_name.value.value
+      .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "").slice(0, 80);
+    const channel_privacy = vals.channel_privacy.value.selected_option.value;
+    const channel_type = vals.channel_type.value.value;
+    const channel_topic = vals.channel_topic?.value?.value || "N/A";
+    const channel_description = vals.channel_description?.value?.value || "N/A";
+    const channel_owner = vals.channel_owner.value.selected_user;
+
     await slackAPI("chat.postMessage", {
       channel: ADMIN_CHANNEL_ID,
-      text: `New Channel Request: #${sanitized}`,
+      text: `New Channel Request: #${channel_name}`,
       blocks: [
         {
           type: "header",
@@ -64,12 +151,12 @@ app.post("/request-channel", async (req, res) => {
           type: "section",
           fields: [
             { type: "mrkdwn", text: `*Requested by:*\n<@${requester_id}>` },
-            { type: "mrkdwn", text: `*Channel Name:*\n#${sanitized}` },
-            { type: "mrkdwn", text: `*Type:*\n${channel_type || "N/A"}` },
-            { type: "mrkdwn", text: `*Privacy:*\n${channel_privacy || "Public"}` },
-            { type: "mrkdwn", text: `*Topic:*\n${channel_topic || "N/A"}` },
-            { type: "mrkdwn", text: `*Description:*\n${channel_description || "N/A"}` },
-            { type: "mrkdwn", text: `*Owner:*\n${channel_owner || "N/A"}` },
+            { type: "mrkdwn", text: `*Channel Name:*\n#${channel_name}` },
+            { type: "mrkdwn", text: `*Privacy:*\n${channel_privacy}` },
+            { type: "mrkdwn", text: `*Type:*\n${channel_type}` },
+            { type: "mrkdwn", text: `*Topic:*\n${channel_topic}` },
+            { type: "mrkdwn", text: `*Description:*\n${channel_description}` },
+            { type: "mrkdwn", text: `*Owner:*\n<@${channel_owner}>` },
           ],
         },
         {
@@ -81,64 +168,42 @@ app.post("/request-channel", async (req, res) => {
               text: { type: "plain_text", text: "✅ Approve" },
               style: "primary",
               action_id: "approve_channel",
-              value: JSON.stringify({
-                channel_name: sanitized,
-                requester_id,
-                channel_type,
-                channel_privacy,
-                channel_topic,
-                channel_description,
-                channel_owner,
-              }),
+              value: JSON.stringify({ channel_name, requester_id, channel_privacy }),
             },
             {
               type: "button",
               text: { type: "plain_text", text: "❌ Deny" },
               style: "danger",
               action_id: "deny_channel",
-              value: JSON.stringify({ channel_name: sanitized, requester_id }),
+              value: JSON.stringify({ channel_name, requester_id }),
             },
           ],
         },
       ],
     });
-
-    res.status(200).json({ message: "Request submitted for approval." });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    return;
   }
-});
 
-// ─── 2. Interactivity — handles Approve / Deny button clicks ─────────────────
+  // Handle Approve / Deny button clicks
+  if (payload.type === "block_actions") {
+    const action = payload.actions[0];
+    const { channel_name, requester_id, channel_privacy } = JSON.parse(action.value);
+    const adminWhoActed = payload.user.id;
+    const messageTs = payload.message.ts;
+    const channelOfMessage = payload.channel.id;
 
-app.post("/slack/actions", async (req, res) => {
-  const payload = JSON.parse(req.body.payload);
-  const action = payload.actions[0];
-  const { channel_name, requester_id } = JSON.parse(action.value);
-  const adminWhoActed = payload.user.id;
-  const messageTs = payload.message.ts;
-  const channelOfMessage = payload.channel.id;
-
-  // Acknowledge immediately
-  res.status(200).send();
-
-  try {
     if (action.action_id === "approve_channel") {
-      // Create the channel
       const created = await slackAPI("conversations.create", {
         name: channel_name,
-        is_private: false,
+        is_private: channel_privacy === "private",
       });
       const newChannelId = created.channel.id;
 
-      // Add the requester to the new channel
       await slackAPI("conversations.invite", {
         channel: newChannelId,
         users: requester_id,
       });
 
-      // Update the approval card to show approved
       await slackAPI("chat.update", {
         channel: channelOfMessage,
         ts: messageTs,
@@ -154,14 +219,12 @@ app.post("/slack/actions", async (req, res) => {
         ],
       });
 
-      // DM the requester
       await slackAPI("chat.postMessage", {
         channel: requester_id,
-        text: `Hey! Your public channel *#${channel_name}* is live! 🎉\n\nYou've been added — go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n-IS Team`,
+        text: `Hey! Your channel *#${channel_name}* is live! 🎉\n\nYou've been added — go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n-IS Team`,
       });
 
     } else if (action.action_id === "deny_channel") {
-      // Update the approval card to show denied
       await slackAPI("chat.update", {
         channel: channelOfMessage,
         ts: messageTs,
@@ -177,14 +240,11 @@ app.post("/slack/actions", async (req, res) => {
         ],
       });
 
-      // DM the requester
       await slackAPI("chat.postMessage", {
         channel: requester_id,
         text: `Your request for *#${channel_name}* was reviewed and unfortunately denied. Reach out to your admin if you have questions.\n-IS Team`,
       });
     }
-  } catch (err) {
-    console.error("Action handling error:", err);
   }
 });
 
