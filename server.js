@@ -28,13 +28,18 @@ app.use((req, res, next) => {
 // ─── Slack signature verification ─────────────────────────────────────────────
 
 function verifySlack(req) {
-  const ts = req.headers["x-slack-request-timestamp"];
-  const sig = req.headers["x-slack-signature"];
-  if (!ts || !sig) return false;
-  if (Math.abs(Date.now() / 1000 - ts) > 300) return false;
-  const base = `v0:${ts}:${req.rawBody}`;
-  const hash = "v0=" + crypto.createHmac("sha256", SLACK_SIGNING_SECRET).update(base).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(sig));
+  try {
+    const ts = req.headers["x-slack-request-timestamp"];
+    const sig = req.headers["x-slack-signature"];
+    if (!ts || !sig || !SLACK_SIGNING_SECRET) return false;
+    if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
+    const base = `v0:${ts}:${req.rawBody || ""}`;
+    const hash = "v0=" + crypto.createHmac("sha256", SLACK_SIGNING_SECRET).update(base, "utf8").digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(hash, "utf8"), Buffer.from(sig, "utf8"));
+  } catch (e) {
+    console.error("Signature verification error:", e);
+    return false;
+  }
 }
 
 // ─── Slack API helper ─────────────────────────────────────────────────────────
