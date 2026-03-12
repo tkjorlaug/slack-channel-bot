@@ -124,6 +124,13 @@ app.post("/slack/command", async (req, res) => {
         },
         {
           type: "input",
+          block_id: "channel_members",
+          label: { type: "plain_text", text: "Who should be added to this channel?" },
+          element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members to add..." } },
+          optional: true,
+        },
+        {
+          type: "input",
           block_id: "channel_topic",
           label: { type: "plain_text", text: "What is the topic of this channel?" },
           element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
@@ -133,6 +140,13 @@ app.post("/slack/command", async (req, res) => {
           block_id: "channel_description",
           label: { type: "plain_text", text: "What is the description of this channel?" },
           element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
+        },
+        {
+          type: "input",
+          block_id: "channel_members",
+          label: { type: "plain_text", text: "Who should be added to this channel?" },
+          element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members to add..." } },
+          optional: true,
         },
       ],
     },
@@ -158,6 +172,7 @@ app.post("/slack/actions", async (req, res) => {
     const channel_owner = vals.channel_owner.value.selected_user;
     const channel_topic = vals.channel_topic.value.value;
     const channel_description = vals.channel_description.value.value;
+    const channel_members = vals.channel_members?.value?.selected_users || [];
 
     await slackAPI("chat.postMessage", {
       channel: ADMIN_CHANNEL_ID,
@@ -188,7 +203,7 @@ app.post("/slack/actions", async (req, res) => {
               text: { type: "plain_text", text: "✅ Approve" },
               style: "primary",
               action_id: "approve_channel",
-              value: JSON.stringify({ channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner }),
+              value: JSON.stringify({ channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner, channel_members }),
             },
             {
               type: "button",
@@ -207,7 +222,7 @@ app.post("/slack/actions", async (req, res) => {
   // ── Button clicks ──
   if (payload.type === "block_actions") {
     const action = payload.actions[0];
-    const { channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner } = JSON.parse(action.value);
+    const { channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner, channel_members } = JSON.parse(action.value);
     const adminWhoActed = payload.user.id;
     const messageTs = payload.message.ts;
     const channelOfMessage = payload.channel.id;
@@ -228,6 +243,15 @@ app.post("/slack/actions", async (req, res) => {
         await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id });
       } catch (e) {
         if (!e.message.includes("already_in_channel")) throw e;
+      }
+
+      // Invite additional members if any were selected
+      if (channel_members && channel_members.length > 0) {
+        try {
+          await slackAPI("conversations.invite", { channel: newChannelId, users: channel_members.join(",") });
+        } catch (e) {
+          if (!e.message.includes("already_in_channel")) throw e;
+        }
       }
 
       await slackAPI("chat.update", {
