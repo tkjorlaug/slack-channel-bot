@@ -76,12 +76,6 @@ app.post("/slack/command", async (req, res) => {
       blocks: [
         {
           type: "input",
-          block_id: "channel_name",
-          label: { type: "plain_text", text: "What should the channel name be?" },
-          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. project-marketing" } },
-        },
-        {
-          type: "input",
           block_id: "channel_privacy",
           label: { type: "plain_text", text: "Should this channel be public or private?" },
           element: {
@@ -101,23 +95,27 @@ app.post("/slack/command", async (req, res) => {
         },
         {
           type: "input",
-          block_id: "channel_topic",
-          label: { type: "plain_text", text: "What is the topic of this channel?" },
-          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
-          optional: true,
-        },
-        {
-          type: "input",
-          block_id: "channel_description",
-          label: { type: "plain_text", text: "What is the description of this channel?" },
-          element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
-          optional: true,
+          block_id: "channel_name",
+          label: { type: "plain_text", text: "What should the channel name be?" },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. project-marketing" } },
         },
         {
           type: "input",
           block_id: "channel_owner",
           label: { type: "plain_text", text: "Who will own this channel?" },
           element: { type: "users_select", action_id: "value" },
+        },
+        {
+          type: "input",
+          block_id: "channel_topic",
+          label: { type: "plain_text", text: "What is the topic of this channel?" },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
+        },
+        {
+          type: "input",
+          block_id: "channel_description",
+          label: { type: "plain_text", text: "What is the description of this channel?" },
+          element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
         },
       ],
     },
@@ -139,8 +137,8 @@ app.post("/slack/actions", async (req, res) => {
       .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "").slice(0, 80);
     const channel_privacy = vals.channel_privacy.value.selected_option.value;
     const channel_type = vals.channel_type.value.value;
-    const channel_topic = vals.channel_topic?.value?.value || "N/A";
-    const channel_description = vals.channel_description?.value?.value || "N/A";
+    const channel_topic = vals.channel_topic.value.value;
+    const channel_description = vals.channel_description.value.value;
     const channel_owner = vals.channel_owner.value.selected_user;
 
     await slackAPI("chat.postMessage", {
