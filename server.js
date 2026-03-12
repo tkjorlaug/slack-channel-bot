@@ -305,7 +305,7 @@ app.post("/slack/actions", async (req, res) => {
 
       await slackAPI("chat.postMessage", {
         channel: requester_id,
-        text: `Your request for *#${channel_name}* was reviewed and unfortunately denied. Reach out to your admin if you have questions.\n\n-IS Team`,
+        text: `Your request for *#${channel_name}* was reviewed and denied. Please reach out if you have any further questions regarding this request.\n\n-IS Team`,
       });
     }
   }
