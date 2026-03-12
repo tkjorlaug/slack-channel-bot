@@ -220,10 +220,14 @@ app.post("/slack/actions", async (req, res) => {
 
       // Join the channel with bot token first, then invite requester
       await slackAPI("conversations.join", { channel: newChannelId });
-      await slackAPI("conversations.invite", {
-        channel: newChannelId,
-        users: requester_id,
-      });
+      try {
+        await slackAPI("conversations.invite", {
+          channel: newChannelId,
+          users: requester_id,
+        });
+      } catch (e) {
+        if (!e.message.includes("already_in_channel")) throw e;
+      }
 
       await slackAPI("chat.update", {
         channel: channelOfMessage,
