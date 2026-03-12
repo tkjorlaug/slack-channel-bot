@@ -56,7 +56,10 @@ async function slackAPI(method, body, useUserToken = false) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(`Slack API error [${method}]: ${data.error}`);
+  if (!data.ok) {
+    console.error(`Slack API error [${method}]:`, JSON.stringify(data));
+    throw new Error(`Slack API error [${method}]: ${data.error}`);
+  }
   return data;
 }
 
