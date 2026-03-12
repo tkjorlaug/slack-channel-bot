@@ -91,7 +91,22 @@ app.post("/slack/command", async (req, res) => {
           type: "input",
           block_id: "channel_type",
           label: { type: "plain_text", text: "What type of channel is this?" },
-          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Project, Team, Social" } },
+          element: {
+            type: "static_select",
+            action_id: "value",
+            placeholder: { type: "plain_text", text: "Pick a channel type" },
+            options: [
+              { text: { type: "plain_text", text: "company-" }, value: "company-" },
+              { text: { type: "plain_text", text: "event-" }, value: "event-" },
+              { text: { type: "plain_text", text: "feed-" }, value: "feed-" },
+              { text: { type: "plain_text", text: "hr-" }, value: "hr-" },
+              { text: { type: "plain_text", text: "product-" }, value: "product-" },
+              { text: { type: "plain_text", text: "project-" }, value: "project-" },
+              { text: { type: "plain_text", text: "social-" }, value: "social-" },
+              { text: { type: "plain_text", text: "team-" }, value: "team-" },
+              { text: { type: "plain_text", text: "topic-" }, value: "topic-" },
+            ],
+          },
         },
         {
           type: "input",
