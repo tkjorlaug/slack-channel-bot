@@ -312,6 +312,14 @@ app.post("/slack/actions", async (req, res) => {
         is_private: channel_privacy === "private",
       }, true);
       const newChannelId = created.channel.id;
+      const botUserId = (await slackAPI("auth.test")).user_id;
+
+      // Remove yourself (user token owner) from the channel after creation
+      try {
+        await slackAPI("conversations.leave", { channel: newChannelId }, true);
+      } catch (e) {
+        console.error("Could not leave channel:", e.message);
+      }
 
       const isPrivate = channel_privacy === "private";
 
