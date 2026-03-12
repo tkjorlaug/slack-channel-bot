@@ -223,7 +223,7 @@ app.post("/slack/actions", async (req, res) => {
       view: {
         type: "modal",
         callback_id: "channel_request_modal",
-        title: { type: "plain_text", text: "Request a Channel" },
+        title: { type: "plain_text", text: "New Channel Request" },
         submit: { type: "plain_text", text: "Submit" },
         close: { type: "plain_text", text: "Cancel" },
         blocks: [
