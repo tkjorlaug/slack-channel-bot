@@ -12,7 +12,7 @@ const {
   PORT = 3000,
 } = process.env;
 
-// ─── Raw body parser (needed for Slack signature verification) ────────────────
+// ─── Raw body parser ──────────────────────────────────────────────────────────
 
 app.use((req, res, next) => {
   let data = "";
@@ -65,7 +65,7 @@ async function slackAPI(method, body, useUserToken = false) {
 app.post("/slack/command", async (req, res) => {
   if (!verifySlack(req)) return res.status(401).send("Unauthorized");
   const triggerId = req.body.trigger_id;
-  res.status(200).send(); // Acknowledge immediately before any async work
+  res.status(200).send();
 
   await slackAPI("views.open", {
     trigger_id: triggerId,
@@ -114,7 +114,7 @@ app.post("/slack/command", async (req, res) => {
           type: "input",
           block_id: "channel_name",
           label: { type: "plain_text", text: "What should the channel name be?" },
-          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. project-marketing" } },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. marketing (prefix will be added automatically)" } },
         },
         {
           type: "input",
@@ -139,24 +139,25 @@ app.post("/slack/command", async (req, res) => {
   });
 });
 
-// ─── 2. Modal submission — posts approval message ─────────────────────────────
+// ─── 2. Actions — modal submission + button clicks ────────────────────────────
 
 app.post("/slack/actions", async (req, res) => {
   const payload = JSON.parse(req.body.payload);
-  res.status(200).send(); // Acknowledge immediately
+  res.status(200).send();
 
-  // Handle modal submission
+  // ── Modal submission ──
   if (payload.type === "view_submission" && payload.view.callback_id === "channel_request_modal") {
     const vals = payload.view.state.values;
     const requester_id = payload.user.id;
 
+    const channel_privacy = vals.channel_privacy.value.selected_option.value;
     const channel_type = vals.channel_type.value.selected_option.value;
     const raw_name = vals.channel_name.value.value
       .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "").slice(0, 79);
     const channel_name = `${channel_type}${raw_name}`;
+    const channel_owner = vals.channel_owner.value.selected_user;
     const channel_topic = vals.channel_topic.value.value;
     const channel_description = vals.channel_description.value.value;
-    const channel_owner = vals.channel_owner.value.selected_user;
 
     await slackAPI("chat.postMessage", {
       channel: ADMIN_CHANNEL_ID,
@@ -203,7 +204,7 @@ app.post("/slack/actions", async (req, res) => {
     return;
   }
 
-  // Handle Approve / Deny button clicks
+  // ── Button clicks ──
   if (payload.type === "block_actions") {
     const action = payload.actions[0];
     const { channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner } = JSON.parse(action.value);
@@ -215,16 +216,12 @@ app.post("/slack/actions", async (req, res) => {
       const created = await slackAPI("conversations.create", {
         name: channel_name,
         is_private: channel_privacy === "private",
-      }, true); // use user token for channel creation
+      }, true);
       const newChannelId = created.channel.id;
 
-      // Join the channel with bot token first, then invite requester
       await slackAPI("conversations.join", { channel: newChannelId });
       try {
-        await slackAPI("conversations.invite", {
-          channel: newChannelId,
-          users: requester_id,
-        });
+        await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id });
       } catch (e) {
         if (!e.message.includes("already_in_channel")) throw e;
       }
@@ -270,17 +267,14 @@ app.post("/slack/actions", async (req, res) => {
         blocks: [
           {
             type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `❌ *Denied* by <@${adminWhoActed}>\n*Channel:* #${channel_name}\n*Requester:* <@${requester_id}>`,
-            },
+            text: { type: "mrkdwn", text: `❌ *Denied* by <@${adminWhoActed}>\n*Channel:* #${channel_name}\n*Requester:* <@${requester_id}>` },
           },
         ],
       });
 
       await slackAPI("chat.postMessage", {
         channel: requester_id,
-        text: `Your request for *#${channel_name}* was reviewed and unfortunately denied. Reach out to your admin if you have questions.\n-IS Team`,
+        text: `Your request for *#${channel_name}* was reviewed and unfortunately denied. Reach out to your admin if you have questions.\n\n-IS Team`,
       });
     }
   }
@@ -292,7 +286,6 @@ app.get("/", (_, res) => res.send("Slack Channel Bot is running ✅"));
 
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
-  // Keep the free Render instance alive by pinging every 10 minutes
   setInterval(() => {
     fetch(`https://slack-channel-bot-8gip.onrender.com/`)
       .then(() => console.log("Keep-alive ping sent"))
