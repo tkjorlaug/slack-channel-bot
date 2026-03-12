@@ -81,7 +81,7 @@ app.post("/slack/command", async (req, res) => {
       blocks: [
         {
           type: "input",
-          block_id: "channel_privacy",
+          block_id: "blk_privacy",
           label: { type: "plain_text", text: "Should this channel be public or private?" },
           element: {
             type: "static_select",
@@ -94,7 +94,7 @@ app.post("/slack/command", async (req, res) => {
         },
         {
           type: "input",
-          block_id: "channel_type",
+          block_id: "blk_type",
           label: { type: "plain_text", text: "What type of channel is this?" },
           element: {
             type: "static_select",
@@ -115,41 +115,34 @@ app.post("/slack/command", async (req, res) => {
         },
         {
           type: "input",
-          block_id: "channel_name",
+          block_id: "blk_name",
           label: { type: "plain_text", text: "What should the channel name be?" },
           element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. marketing (prefix will be added automatically)" } },
         },
         {
           type: "input",
-          block_id: "channel_owner",
+          block_id: "blk_owner",
           label: { type: "plain_text", text: "Who will own this channel?" },
           element: { type: "users_select", action_id: "value" },
         },
         {
           type: "input",
-          block_id: "channel_members",
+          block_id: "blk_members",
           label: { type: "plain_text", text: "Who should be added to this channel? (optional)" },
           optional: true,
           element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members..." } },
         },
         {
           type: "input",
-          block_id: "channel_topic",
+          block_id: "blk_topic",
           label: { type: "plain_text", text: "What is the topic of this channel?" },
           element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
         },
         {
           type: "input",
-          block_id: "channel_description",
+          block_id: "blk_description",
           label: { type: "plain_text", text: "What is the description of this channel?" },
           element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
-        },
-        {
-          type: "input",
-          block_id: "channel_members",
-          label: { type: "plain_text", text: "Who should be added to this channel?" },
-          element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members to add..." } },
-          optional: true,
         },
       ],
     },
@@ -167,15 +160,15 @@ app.post("/slack/actions", async (req, res) => {
     const vals = payload.view.state.values;
     const requester_id = payload.user.id;
 
-    const channel_privacy = vals.channel_privacy.value.selected_option.value;
-    const channel_type = vals.channel_type.value.selected_option.value;
-    const raw_name = vals.channel_name.value.value
+    const channel_privacy = vals.blk_privacy.value.selected_option.value;
+    const channel_type = vals.blk_type.value.selected_option.value;
+    const raw_name = vals.blk_name.value.value
       .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "").slice(0, 79);
     const channel_name = `${channel_type}${raw_name}`;
-    const channel_owner = vals.channel_owner.value.selected_user;
-    const channel_topic = vals.channel_topic.value.value;
-    const channel_description = vals.channel_description.value.value;
-    const channel_members = vals.channel_members?.value?.selected_users || [];
+    const channel_owner = vals.blk_owner.value.selected_user;
+    const channel_members = vals.blk_members?.value?.selected_users || [];
+    const channel_topic = vals.blk_topic.value.value;
+    const channel_description = vals.blk_description.value.value;
 
     await slackAPI("chat.postMessage", {
       channel: ADMIN_CHANNEL_ID,
@@ -195,6 +188,7 @@ app.post("/slack/actions", async (req, res) => {
             { type: "mrkdwn", text: `*Topic:*\n${channel_topic}` },
             { type: "mrkdwn", text: `*Description:*\n${channel_description}` },
             { type: "mrkdwn", text: `*Owner:*\n<@${channel_owner}>` },
+            { type: "mrkdwn", text: `*Members to add:*\n${channel_members.length > 0 ? channel_members.map(m => `<@${m}>`).join(", ") : "None"}` },
           ],
         },
         {
@@ -239,16 +233,15 @@ app.post("/slack/actions", async (req, res) => {
 
       await slackAPI("conversations.join", { channel: newChannelId });
 
-      // Set topic and description on the new channel
       if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic });
       if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description });
+
       try {
         await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id });
       } catch (e) {
         if (!e.message.includes("already_in_channel")) throw e;
       }
 
-      // Invite additional members if any were selected
       if (channel_members && channel_members.length > 0) {
         try {
           await slackAPI("conversations.invite", { channel: newChannelId, users: channel_members.join(",") });
@@ -276,6 +269,7 @@ app.post("/slack/actions", async (req, res) => {
               { type: "mrkdwn", text: `*Topic:*\n${channel_topic}` },
               { type: "mrkdwn", text: `*Description:*\n${channel_description}` },
               { type: "mrkdwn", text: `*Owner:*\n<@${channel_owner}>` },
+              { type: "mrkdwn", text: `*Members added:*\n${channel_members && channel_members.length > 0 ? channel_members.map(m => `<@${m}>`).join(", ") : "None"}` },
             ],
           },
           {
