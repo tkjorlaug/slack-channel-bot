@@ -126,8 +126,9 @@ app.post("/slack/command", async (req, res) => {
           type: "input",
           block_id: "channel_members",
           label: { type: "plain_text", text: "Who should be added to this channel?" },
-          element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members to add..." } },
+          hint: { type: "plain_text", text: "Optional - select any members to add when the channel is created" },
           optional: true,
+          element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members to add..." } },
         },
         {
           type: "input",
