@@ -6,6 +6,7 @@ const app = express();
 
 const {
   SLACK_BOT_TOKEN,
+  SLACK_USER_TOKEN,
   SLACK_SIGNING_SECRET,
   ADMIN_CHANNEL_ID,
   PORT = 3000,
@@ -44,12 +45,13 @@ function verifySlack(req) {
 
 // ─── Slack API helper ─────────────────────────────────────────────────────────
 
-async function slackAPI(method, body) {
+async function slackAPI(method, body, useUserToken = false) {
+  const token = useUserToken ? SLACK_USER_TOKEN : SLACK_BOT_TOKEN;
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   });
@@ -213,7 +215,7 @@ app.post("/slack/actions", async (req, res) => {
       const created = await slackAPI("conversations.create", {
         name: channel_name,
         is_private: channel_privacy === "private",
-      });
+      }, true); // use user token for channel creation
       const newChannelId = created.channel.id;
 
       await slackAPI("conversations.invite", {
