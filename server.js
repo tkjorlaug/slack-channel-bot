@@ -187,7 +187,7 @@ app.post("/slack/actions", async (req, res) => {
               text: { type: "plain_text", text: "✅ Approve" },
               style: "primary",
               action_id: "approve_channel",
-              value: JSON.stringify({ channel_name, requester_id, channel_privacy }),
+              value: JSON.stringify({ channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner }),
             },
             {
               type: "button",
@@ -206,7 +206,7 @@ app.post("/slack/actions", async (req, res) => {
   // Handle Approve / Deny button clicks
   if (payload.type === "block_actions") {
     const action = payload.actions[0];
-    const { channel_name, requester_id, channel_privacy } = JSON.parse(action.value);
+    const { channel_name, requester_id, channel_privacy, channel_type, channel_topic, channel_description, channel_owner } = JSON.parse(action.value);
     const adminWhoActed = payload.user.id;
     const messageTs = payload.message.ts;
     const channelOfMessage = payload.channel.id;
@@ -235,18 +235,31 @@ app.post("/slack/actions", async (req, res) => {
         text: `✅ Approved: #${channel_name}`,
         blocks: [
           {
+            type: "header",
+            text: { type: "plain_text", text: "🔔 New Channel Request!" },
+          },
+          {
             type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `✅ *Approved* by <@${adminWhoActed}>\n*Channel created:* <#${newChannelId}>\n*Requester:* <@${requester_id}>`,
-            },
+            fields: [
+              { type: "mrkdwn", text: `*Requested by:*\n<@${requester_id}>` },
+              { type: "mrkdwn", text: `*Channel Name:*\n<#${newChannelId}>` },
+              { type: "mrkdwn", text: `*Privacy:*\n${channel_privacy}` },
+              { type: "mrkdwn", text: `*Type:*\n${channel_type}` },
+              { type: "mrkdwn", text: `*Topic:*\n${channel_topic}` },
+              { type: "mrkdwn", text: `*Description:*\n${channel_description}` },
+              { type: "mrkdwn", text: `*Owner:*\n<@${channel_owner}>` },
+            ],
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: `✅ *Approved* by <@${adminWhoActed}>` },
           },
         ],
       });
 
       await slackAPI("chat.postMessage", {
         channel: requester_id,
-        text: `Hey! Your channel *#${channel_name}* is live! 🎉\n\nYou've been added — go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n-IS Team`,
+        text: `Hey! Your channel *#${channel_name}* is live! 🎉\n\nYou've been added - go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n\n-IS Team`,
       });
 
     } else if (action.action_id === "deny_channel") {
