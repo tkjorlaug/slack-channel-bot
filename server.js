@@ -426,7 +426,7 @@ app.post("/slack/events", async (req, res) => {
             elements: [
               {
                 type: "button",
-                text: { type: "plain_text", text: "📋 Request a Channel" },
+                text: { type: "plain_text", text: "📋 New Channel Request" },
                 style: "primary",
                 action_id: "open_request_modal",
               },
