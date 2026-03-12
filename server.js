@@ -398,9 +398,9 @@ app.post("/slack/actions", async (req, res) => {
 app.post("/slack/events", async (req, res) => {
   const body = req.body;
 
-  // URL verification challenge
+  // URL verification challenge — must respond before anything else
   if (body.type === "url_verification") {
-    return res.json({ challenge: body.challenge });
+    return res.status(200).json({ challenge: body.challenge });
   }
 
   res.status(200).send();
