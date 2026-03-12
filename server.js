@@ -287,7 +287,7 @@ app.post("/slack/actions", async (req, res) => {
 
       await slackAPI("chat.postMessage", {
         channel: requester_id,
-        text: `Hey! Your channel *#${channel_name}* is live! 🎉\n\nYou've been added - go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n\n-IS Team`,
+        text: `Hey! Your channel <#${newChannelId}> is live! 🎉\n\nYou've been added - go check it out: <#${newChannelId}>\n\nLet us know if you need anything else!\n\n-IS Team`,
       });
 
     } else if (action.action_id === "deny_channel") {
