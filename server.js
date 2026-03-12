@@ -218,6 +218,8 @@ app.post("/slack/actions", async (req, res) => {
       }, true); // use user token for channel creation
       const newChannelId = created.channel.id;
 
+      // Join the channel with bot token first, then invite requester
+      await slackAPI("conversations.join", { channel: newChannelId });
       await slackAPI("conversations.invite", {
         channel: newChannelId,
         users: requester_id,
