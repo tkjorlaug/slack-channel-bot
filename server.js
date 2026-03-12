@@ -231,23 +231,26 @@ app.post("/slack/actions", async (req, res) => {
       }, true);
       const newChannelId = created.channel.id;
 
+      const isPrivate = channel_privacy === "private";
+
       // Only join public channels — private channels don't support conversations.join
-      if (channel_privacy !== "private") {
+      if (!isPrivate) {
         await slackAPI("conversations.join", { channel: newChannelId });
       }
 
-      if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic });
-      if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description });
+      // Use user token for private channels since bot can't access them
+      if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic }, isPrivate);
+      if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description }, isPrivate);
 
       try {
-        await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id });
+        await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id }, isPrivate);
       } catch (e) {
         if (!e.message.includes("already_in_channel")) throw e;
       }
 
       if (channel_members && channel_members.length > 0) {
         try {
-          await slackAPI("conversations.invite", { channel: newChannelId, users: channel_members.join(",") });
+          await slackAPI("conversations.invite", { channel: newChannelId, users: channel_members.join(",") }, isPrivate);
         } catch (e) {
           if (!e.message.includes("already_in_channel")) throw e;
         }
