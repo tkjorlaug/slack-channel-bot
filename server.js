@@ -245,14 +245,14 @@ app.post("/slack/actions", async (req, res) => {
       try {
         await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id }, isPrivate);
       } catch (e) {
-        if (!e.message.includes("already_in_channel")) throw e;
+        if (!e.message.includes("already_in_channel") && !e.message.includes("cant_invite_self")) throw e;
       }
 
       if (channel_members && channel_members.length > 0) {
         try {
           await slackAPI("conversations.invite", { channel: newChannelId, users: channel_members.join(",") }, isPrivate);
         } catch (e) {
-          if (!e.message.includes("already_in_channel")) throw e;
+          if (!e.message.includes("already_in_channel") && !e.message.includes("cant_invite_self")) throw e;
         }
       }
 
