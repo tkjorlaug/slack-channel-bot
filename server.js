@@ -151,7 +151,7 @@ app.post("/slack/actions", async (req, res) => {
     const channel_name = vals.channel_name.value.value
       .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "").slice(0, 80);
     const channel_privacy = vals.channel_privacy.value.selected_option.value;
-    const channel_type = vals.channel_type.value.value;
+    const channel_type = vals.channel_type.value.selected_option.value;
     const channel_topic = vals.channel_topic.value.value;
     const channel_description = vals.channel_description.value.value;
     const channel_owner = vals.channel_owner.value.selected_user;
