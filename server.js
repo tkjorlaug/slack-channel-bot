@@ -220,6 +220,10 @@ app.post("/slack/actions", async (req, res) => {
       const newChannelId = created.channel.id;
 
       await slackAPI("conversations.join", { channel: newChannelId });
+
+      // Set topic and description on the new channel
+      if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic });
+      if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description });
       try {
         await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id });
       } catch (e) {
