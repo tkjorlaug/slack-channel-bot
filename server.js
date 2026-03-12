@@ -216,6 +216,88 @@ app.post("/slack/actions", async (req, res) => {
     return;
   }
 
+  // ── Home tab button click ──
+  if (payload.type === "block_actions" && payload.actions[0].action_id === "open_request_modal") {
+    await slackAPI("views.open", {
+      trigger_id: payload.trigger_id,
+      view: {
+        type: "modal",
+        callback_id: "channel_request_modal",
+        title: { type: "plain_text", text: "Request a Channel" },
+        submit: { type: "plain_text", text: "Submit" },
+        close: { type: "plain_text", text: "Cancel" },
+        blocks: [
+          {
+            type: "input",
+            block_id: "blk_privacy",
+            label: { type: "plain_text", text: "Should this channel be public or private?" },
+            element: {
+              type: "static_select",
+              action_id: "value",
+              options: [
+                { text: { type: "plain_text", text: "Public" }, value: "public" },
+                { text: { type: "plain_text", text: "Private" }, value: "private" },
+              ],
+            },
+          },
+          {
+            type: "input",
+            block_id: "blk_type",
+            label: { type: "plain_text", text: "What type of channel is this?" },
+            element: {
+              type: "static_select",
+              action_id: "value",
+              placeholder: { type: "plain_text", text: "Pick a channel type" },
+              options: [
+                { text: { type: "plain_text", text: "company-" }, value: "company-" },
+                { text: { type: "plain_text", text: "event-" }, value: "event-" },
+                { text: { type: "plain_text", text: "feed-" }, value: "feed-" },
+                { text: { type: "plain_text", text: "hr-" }, value: "hr-" },
+                { text: { type: "plain_text", text: "product-" }, value: "product-" },
+                { text: { type: "plain_text", text: "project-" }, value: "project-" },
+                { text: { type: "plain_text", text: "social-" }, value: "social-" },
+                { text: { type: "plain_text", text: "team-" }, value: "team-" },
+                { text: { type: "plain_text", text: "topic-" }, value: "topic-" },
+              ],
+            },
+          },
+          {
+            type: "input",
+            block_id: "blk_name",
+            label: { type: "plain_text", text: "What should the channel name be?" },
+            element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. marketing" } },
+          },
+          {
+            type: "input",
+            block_id: "blk_owner",
+            label: { type: "plain_text", text: "Who will own this channel?" },
+            element: { type: "users_select", action_id: "value" },
+          },
+          {
+            type: "input",
+            block_id: "blk_members",
+            label: { type: "plain_text", text: "Who should be added to this channel?" },
+            optional: true,
+            element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members..." } },
+          },
+          {
+            type: "input",
+            block_id: "blk_topic",
+            label: { type: "plain_text", text: "What is the topic of this channel?" },
+            element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. Marketing campaign updates" } },
+          },
+          {
+            type: "input",
+            block_id: "blk_description",
+            label: { type: "plain_text", text: "What is the description of this channel?" },
+            element: { type: "plain_text_input", action_id: "value", multiline: true, placeholder: { type: "plain_text", text: "Describe the purpose of this channel..." } },
+          },
+        ],
+      },
+    });
+    return;
+  }
+
   // ── Button clicks ──
   if (payload.type === "block_actions") {
     const action = payload.actions[0];
@@ -311,7 +393,50 @@ app.post("/slack/actions", async (req, res) => {
   }
 });
 
-// ─── Health check ─────────────────────────────────────────────────────────────
+// ─── 3. App Home — renders the Home tab ──────────────────────────────────────
+
+app.post("/slack/events", async (req, res) => {
+  const body = req.body;
+
+  // URL verification challenge
+  if (body.type === "url_verification") {
+    return res.json({ challenge: body.challenge });
+  }
+
+  res.status(200).send();
+
+  if (body.event?.type === "app_home_opened") {
+    const userId = body.event.user;
+    await slackAPI("views.publish", {
+      user_id: userId,
+      view: {
+        type: "home",
+        blocks: [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "👋 Welcome to the Slack Channel Bot!" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: "Need a new Slack channel? Submit a request below and our team will review it. You'll get a DM once it's been approved or denied." },
+          },
+          { type: "divider" },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: { type: "plain_text", text: "📋 Request a Channel" },
+                style: "primary",
+                action_id: "open_request_modal",
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+});
 
 app.get("/", (_, res) => res.send("Slack Channel Bot is running ✅"));
 
