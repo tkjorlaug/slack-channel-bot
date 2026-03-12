@@ -62,9 +62,8 @@ async function slackAPI(method, body) {
 
 app.post("/slack/command", async (req, res) => {
   if (!verifySlack(req)) return res.status(401).send("Unauthorized");
-  res.status(200).send(); // Acknowledge immediately
-
   const triggerId = req.body.trigger_id;
+  res.status(200).send(); // Acknowledge immediately before any async work
 
   await slackAPI("views.open", {
     trigger_id: triggerId,
@@ -257,4 +256,12 @@ app.post("/slack/actions", async (req, res) => {
 
 app.get("/", (_, res) => res.send("Slack Channel Bot is running ✅"));
 
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+  // Keep the free Render instance alive by pinging every 10 minutes
+  setInterval(() => {
+    fetch(`https://slack-channel-bot-8gip.onrender.com/`)
+      .then(() => console.log("Keep-alive ping sent"))
+      .catch(e => console.error("Keep-alive error:", e));
+  }, 10 * 60 * 1000);
+});
