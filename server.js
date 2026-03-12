@@ -231,7 +231,10 @@ app.post("/slack/actions", async (req, res) => {
       }, true);
       const newChannelId = created.channel.id;
 
-      await slackAPI("conversations.join", { channel: newChannelId });
+      // Only join public channels — private channels don't support conversations.join
+      if (channel_privacy !== "private") {
+        await slackAPI("conversations.join", { channel: newChannelId });
+      }
 
       if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic });
       if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description });
