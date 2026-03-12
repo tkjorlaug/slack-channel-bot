@@ -117,7 +117,7 @@ app.post("/slack/command", async (req, res) => {
           type: "input",
           block_id: "blk_name",
           label: { type: "plain_text", text: "What should the channel name be?" },
-          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. marketing (prefix will be added automatically)" } },
+          element: { type: "plain_text_input", action_id: "value", placeholder: { type: "plain_text", text: "e.g. marketing" } },
         },
         {
           type: "input",
@@ -128,7 +128,7 @@ app.post("/slack/command", async (req, res) => {
         {
           type: "input",
           block_id: "blk_members",
-          label: { type: "plain_text", text: "Who should be added to this channel? (optional)" },
+          label: { type: "plain_text", text: "Who should be added to this channel?" },
           optional: true,
           element: { type: "multi_users_select", action_id: "value", placeholder: { type: "plain_text", text: "Select members..." } },
         },
