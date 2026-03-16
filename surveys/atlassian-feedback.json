@@ -1,0 +1,42 @@
+{
+  "title": "Atlassian Usage Survey",
+  "description": "Help us understand how you use Jira and Confluence so we can make better tooling decisions for the team.",
+  "anonymous": false,
+  "deadline": "2026-03-29",
+  "questions": [
+    {
+      "id": "q1",
+      "position": 1,
+      "text": "How often do you use Jira?",
+      "type": "single_select",
+      "options": ["Daily", "Weekly", "Rarely", "Never"]
+    },
+    {
+      "id": "q2",
+      "position": 2,
+      "text": "How often do you use Confluence?",
+      "type": "single_select",
+      "options": ["Daily", "Weekly", "Rarely", "Never"]
+    },
+    {
+      "id": "q3",
+      "position": 3,
+      "text": "How easy do you find Jira and Confluence to use?",
+      "type": "scale",
+      "options": ["1", "2", "3", "4", "5"]
+    },
+    {
+      "id": "q4",
+      "position": 4,
+      "text": "What do you primarily use Jira for?",
+      "type": "single_select",
+      "options": ["Task tracking", "Project management", "Bug tracking", "I don't use it"]
+    },
+    {
+      "id": "q5",
+      "position": 5,
+      "text": "Is there a tool you'd prefer to use instead?",
+      "type": "open_text"
+    }
+  ]
+}
