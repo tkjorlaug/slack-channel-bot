@@ -322,7 +322,7 @@ app.post("/slack/actions", async (req, res) => {
 
       // Use user token for private channels since bot can't access them
       if (channel_topic) await slackAPI("conversations.setTopic", { channel: newChannelId, topic: channel_topic }, isPrivate);
-      if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description }, isPrivate);
+      if (channel_description) await slackAPI("conversations.setPurpose", { channel: newChannelId, purpose: channel_description.slice(0, 250) }, isPrivate);
 
       try {
         await slackAPI("conversations.invite", { channel: newChannelId, users: requester_id }, isPrivate);
